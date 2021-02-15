@@ -280,47 +280,6 @@ function FPP.plySendTouchData(ply, ents)
 end
 
 /*---------------------------------------------------------------------------
-Events that trigger recalculation
----------------------------------------------------------------------------*/
-local function handleConstraintCreation(ent)
-    local ent1, ent2 = ent:GetConstrainedEntities()
-    ent1, ent2 = ent1 or ent.Ent1, ent2 or ent.Ent2
-
-    if not ent1 or not ent2 or not ent1.FPPCanTouch or not ent2.FPPCanTouch then return end
-    local reason = 0
-    local i = 0
-    for Bit, touchType in pairs(touchTypeNumbers) do
-        reason = bit.bor(reason, bit.lshift(reasonNumbers.constrained, i * reasonSize))
-        i = i + 1
-    end
-
-    for _, ply in ipairs(player.GetAll()) do
-        local touch1, touch2 = FPP.plyCanTouchEnt(ply, ent1), FPP.plyCanTouchEnt(ply, ent2)
-
-        -- The constrained entities have the same touching rights.
-        if touch1 == touch2 then continue end
-
-        local restrictedAccess = bit.band(touch1, touch2)
-
-        local send = {}
-        for _, e in pairs(constraint.GetAllConstrainedEntities(ent1) or {}) do
-            if not IsValid(e) then continue end
-            if FPP.plyCanTouchEnt(ply, e) == restrictedAccess then continue end
-
-            e.FPPRestrictConstraint = e.FPPRestrictConstraint or {}
-            e.FPPConstraintReasons = e.FPPConstraintReasons or {}
-            e.FPPRestrictConstraint[ply] = restrictedAccess
-            e.FPPConstraintReasons[ply] = reason
-
-            table.insert(send, e)
-        end
-
-        FPP.plySendTouchData(ply, send)
-    end
-
-end
-
-/*---------------------------------------------------------------------------
 On entity created
 ---------------------------------------------------------------------------*/
 local function onEntitiesCreated(ents)
@@ -330,7 +289,6 @@ local function onEntitiesCreated(ents)
         if not IsValid(ent) then continue end
 
         if isConstraint(ent) then
-            handleConstraintCreation(ent)
             continue
         end
 
