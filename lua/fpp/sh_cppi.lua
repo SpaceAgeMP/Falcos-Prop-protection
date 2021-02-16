@@ -35,7 +35,7 @@ local ENTITY = FindMetaTable("Entity")
 function ENTITY:CPPIGetOwner()
     local Owner = FPP.entGetOwner(self)
     if not IsValid(Owner) or not Owner:IsPlayer() then return SERVER and Owner or nil, self.FPPOwnerID end
-    return Owner, Owner:UniqueID()
+    return Owner, Owner:SteamID()
 end
 
 if SERVER then
@@ -46,7 +46,7 @@ if SERVER then
 
         local valid = IsValid(ply) and ply:IsPlayer()
         local steamId = valid and ply:SteamID() or nil
-        local canSetOwner = hook.Run("CPPIAssignOwnership", ply, self, valid and ply:UniqueID() or ply)
+        local canSetOwner = hook.Run("CPPIAssignOwnership", ply, self, valid and ply:SteamID() or ply)
 
         if canSetOwner == false then return false end
         ply = canSetOwner ~= nil and canSetOwner ~= true and canSetOwner or ply
@@ -61,7 +61,7 @@ if SERVER then
     end
 
     function ENTITY:CPPISetOwnerUID(UID)
-        local ply = UID and player.GetByUniqueID(tostring(UID)) or nil
+        local ply = UID and player.GetBySteamID(tostring(UID)) or nil
         if UID and not IsValid(ply) then return false end
         return self:CPPISetOwner(ply)
     end
