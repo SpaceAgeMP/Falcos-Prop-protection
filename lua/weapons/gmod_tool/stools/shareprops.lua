@@ -23,6 +23,11 @@ function TOOL:LeftClick(trace)
 
     local ply = self:GetOwner()
 
+    if ent:CPPIGetOwner() ~= ply then
+        FPP.Notify(ply, "You do not have the right to share this entity.", false)
+        return
+    end
+
     local Physgun = ent.SharePhysgun1 or false
     local GravGun = ent.ShareGravgun1 or false
     local PlayerUse = ent.SharePlayerUse1 or false
