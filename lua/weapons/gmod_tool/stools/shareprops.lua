@@ -7,6 +7,13 @@ function TOOL:RightClick(trace)
     local ent = trace.Entity
     if not IsValid(ent) or CLIENT then return true end
 
+    local ply = self:GetOwner()
+
+    if ent:CPPIGetOwner() ~= ply then
+        FPP.Notify(ply, "You do not have the right to share this entity.", false)
+        return
+    end
+
     ent.SharePhysgun1 = nil
     ent.ShareGravgun1 = nil
     ent.SharePlayerUse1 = nil
