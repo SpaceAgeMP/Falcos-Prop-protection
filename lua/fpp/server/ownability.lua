@@ -234,7 +234,7 @@ Touch interface
 function FPP.plyCanTouchEnt(ply, ent, touchType)
     ent.FPPCanTouch = ent.FPPCanTouch or {}
     ent.FPPCanTouch[ply] = ent.FPPCanTouch[ply] or 0
-	ent.AllowedPlayers = ent.AllowedPlayers or {}
+    ent.AllowedPlayers = ent.AllowedPlayers or {}
 
     local canTouch = ent.FPPCanTouch[ply]
 
