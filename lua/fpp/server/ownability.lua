@@ -2,7 +2,7 @@ FPP = FPP or {}
 local plyMeta = FindMetaTable("Player")
 local entMeta = FindMetaTable("Entity")
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 Entity data explanation.
 Every ent has a field FPPCanTouch. This is a table with one entry per player.
 Every bit in FPPCanTouch represents a type.
@@ -13,7 +13,7 @@ Every bit in FPPCanTouch represents a type.
 Then there is the FPPCanTouchWhy var This var follows the same idea as FPPCanTouch
 except there are five bits for each type. These 4 bits represent a number that shows the reason
 why a player can or cannot touch a prop.
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 
 local touchTypes = {
     Physgun = 1,
@@ -44,9 +44,9 @@ local reasonNumbers = {
     ["player"] = 8,
 }
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 Utility functions
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 local function getPlySetting(ply, settingName)
     return (ply[settingName] or ply:GetInfo(settingName)) == "1"
 end
@@ -62,9 +62,9 @@ local function isConstraint(ent)
     return ent:IsConstraint() or constraints[ent:GetClass()] or false
 end
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 Touch calculations
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 local hardWhiteListed = { -- things that mess up when not allowed
     ["worldspawn"] = true, -- constraints with the world
     ["gmod_anchor"] = true -- used in slider constraints with world
@@ -110,6 +110,9 @@ local function calculateCanTouchForType(ply, ent, touchType)
     local noTouchOtherPlayerProps = getPlySetting(ply, "FPP_PrivateSettings_OtherPlayerProps")
 
     -- Shared entity
+    if ent.AllowedPlayers and table.HasValue(ent.AllowedPlayers, ply) then
+        return not noTouchOtherPlayerProps, reasonNumbers.shared
+    end
     if ent["Share" .. setting] then return not noTouchOtherPlayerProps, reasonNumbers.shared end
 
     if IsValid(owner) then
@@ -228,16 +231,15 @@ function FPP.recalculateCanTouch(plys, ens)
     FPP.calculatePlayerPrivilege("FPP_TouchOtherPlayersProps", function() recalculateCanTouch(plys, ens) end)
 end
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 Touch interface
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 function FPP.plyCanTouchEnt(ply, ent, touchType)
     ent.FPPCanTouch = ent.FPPCanTouch or {}
     ent.FPPCanTouch[ply] = ent.FPPCanTouch[ply] or 0
     ent.AllowedPlayers = ent.AllowedPlayers or {}
 
     local canTouch = ent.FPPCanTouch[ply]
-
     -- if an entity is constrained, return the least of the rights
     if ent.FPPRestrictConstraint and ent.FPPRestrictConstraint[ply] then
         canTouch = bit.band(ent.FPPRestrictConstraint[ply], ent.FPPCanTouch[ply])
@@ -259,9 +261,9 @@ function FPP.entGetOwner(ent)
     return ent.FPPOwner
 end
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 Networking
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 util.AddNetworkString("FPP_TouchabilityData")
 local function netWriteEntData(ply, ent)
     -- EntIndex for when it's out of the PVS of the player
@@ -285,9 +287,9 @@ function FPP.plySendTouchData(ply, ents)
     net.Send(ply)
 end
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 On entity created
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 local function onEntitiesCreated(ents)
     local send = {}
 
@@ -316,7 +318,6 @@ local function onEntitiesCreated(ents)
     end
 end
 
-
 -- Make a queue of entities created per frame, so the server will send out a maximum-
 -- of one message per player per frame
 local entQueue = {}
@@ -332,10 +333,9 @@ hook.Add("OnEntityCreated", "FPP_EntityCreated", function(ent)
     timer.Create("FPP_OnEntityCreatedTimer", 0, 1, timerFunc)
 end)
 
-
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 On entity removed
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 -- Recalculates touchability information for constrained entities
 -- Note: Assumes normal touchability information is up to date!
 -- Update constraints, O(players * (entities + constraints))
@@ -439,9 +439,9 @@ end
 
 hook.Add("EntityRemoved", "FPP_OnEntityRemoved", onEntityRemoved)
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 Player disconnected
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 local function playerDisconnected(ply)
     local ownedEnts = {}
     for _, ent in ipairs(ents.GetAll()) do
@@ -454,9 +454,9 @@ local function playerDisconnected(ply)
 end
 hook.Add("PlayerDisconnected", "FPP_PlayerDisconnected", playerDisconnected)
 
-/*---------------------------------------------------------------------------
+--[[-------------------------------------------------------------------------
 Usergroup changed
----------------------------------------------------------------------------*/
+---------------------------------------------------------------------------]]
 local function userGroupRecalculate(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
 
