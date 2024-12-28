@@ -4,9 +4,9 @@ FPP.AntiSpam = FPP.AntiSpam or {}
 function FPP.AntiSpam.GhostFreeze(ent, phys)
     ent:SetRenderMode(RENDERMODE_TRANSCOLOR)
     ent:DrawShadow(false)
-    ent.OldColor = ent.OldColor or ent:GetColor()
+    ent.FPPOldColor = ent.FPPOldColor or ent:GetColor()
     ent.StartPos = ent:GetPos()
-    ent:SetColor(Color(ent.OldColor.r, ent.OldColor.g, ent.OldColor.b, ent.OldColor.a - 155))
+    ent:SetColor(Color(ent.FPPOldColor.r, ent.FPPOldColor.g, ent.FPPOldColor.b, ent.FPPOldColor.a - 155))
 
     ent:SetCollisionGroup(COLLISION_GROUP_WORLD)
     ent.CollisionGroup = COLLISION_GROUP_WORLD
@@ -23,10 +23,10 @@ function FPP.UnGhost(ply, ent)
         ent:DrawShadow(true)
         if ent.OldCollisionGroup then ent:SetCollisionGroup(ent.OldCollisionGroup) ent.OldCollisionGroup = nil end
 
-        if ent.OldColor then
-            ent:SetColor(Color(ent.OldColor.r, ent.OldColor.g, ent.OldColor.b, ent.OldColor.a))
+        if ent.FPPOldColor then
+            ent:SetColor(Color(ent.FPPOldColor.r, ent.FPPOldColor.g, ent.FPPOldColor.b, ent.FPPOldColor.a))
         end
-        ent.OldColor = nil
+        ent.FPPOldColor = nil
 
 
         ent:SetCollisionGroup(COLLISION_GROUP_NONE)
@@ -47,6 +47,11 @@ function FPP.AntiSpam.CreateEntity(ply, ent, IsDuplicate)
     if not tobool(FPP.Settings.FPP_ANTISPAM1.toggle) then return end
     local phys = ent:GetPhysicsObject()
     if not phys:IsValid() then return end
+    local entTable = ent:GetTable()
+    -- Some spawn methods trigger different paths to this function, causing an
+    -- entity to be counted multiple times for antispam.
+    if entTable.FPPCountedForAntispam then return end
+    entTable.FPPCountedForAntispam = true
 
     local shouldRegister = hook.Call("FPP_ShouldRegisterAntiSpam", nil, ply, ent, IsDuplicate)
     if shouldRegister == false then return end
@@ -55,27 +60,45 @@ function FPP.AntiSpam.CreateEntity(ply, ent, IsDuplicate)
     -- I power by ten because the volume of a prop can vary between 65 and like a few billion
     if tobool(FPP.Settings.FPP_ANTISPAM1.bigpropantispam) and phys:GetVolume() and phys:GetVolume() > math.pow(10, FPP.Settings.FPP_ANTISPAM1.bigpropsize) and not string.find(class, "constraint") and not string.find(class, "hinge")
     and not string.find(class, "magnet") and not string.find(class, "collision") and not blacklist[class] then
+        ply.FPPAntispamBigProp = ply.FPPAntispamBigProp or 0
+        ply.FPPAntiSpamLastBigProp = ply.FPPAntiSpamLastBigProp or 0
         if not IsDuplicate then
-            ply.FPPAntispamBigProp = (ply.FPPAntispamBigProp or 0) + 1
-            timer.Simple(10 * FPP.Settings.FPP_ANTISPAM1.bigpropwait, function()
-                if not ply:IsValid() then return end
-                ply.FPPAntispamBigProp = ply.FPPAntispamBigProp or 0
-                ply.FPPAntispamBigProp = math.Max(ply.FPPAntispamBigProp - 1, 0)
-            end)
+            ply.FPPAntispamBigProp = ply.FPPAntispamBigProp + 1
         end
 
-        if ply.FPPAntiSpamLastBigProp and ply.FPPAntiSpamLastBigProp > (CurTime() - (FPP.Settings.FPP_ANTISPAM1.bigpropwait * ply.FPPAntispamBigProp)) then
-            FPP.Notify(ply, "Please wait " .. FPP.Settings.FPP_ANTISPAM1.bigpropwait * ply.FPPAntispamBigProp .. " Seconds before spawning a big prop again", false)
-            ply.FPPAntiSpamLastBigProp = CurTime()
+        local curTime = CurTime()
+        local spawningBlockedUntil =
+            ply.FPPAntiSpamLastBigProp + ply.FPPAntispamBigProp * FPP.Settings.FPP_ANTISPAM1.bigpropwait
+
+        if curTime < spawningBlockedUntil then
+            -- The current attempt would have been blocked until
+            -- spawningBlockedUntil. The next attempt will add up to that time.
+            -- The wait time is thus the time the user should wait before the
+            -- next attempt.
+            local waitTime = spawningBlockedUntil + FPP.Settings.FPP_ANTISPAM1.bigpropwait - curTime
+            FPP.Notify(
+                ply,
+                "Please wait " .. math.Round(waitTime, 2) .. " Seconds before spawning a big prop again",
+                false,
+                waitTime
+            )
             ent:Remove()
             return
         end
 
         if not IsDuplicate then
-            ply.FPPAntiSpamLastBigProp = CurTime()
+            ply.FPPAntiSpamLastBigProp = curTime
+            -- Spawning succeeded, reset big prop count to 0
+            ply.FPPAntispamBigProp = 0
         end
+        local waitTime = FPP.Settings.FPP_ANTISPAM1.bigpropwait
         FPP.AntiSpam.GhostFreeze(ent, phys)
-        FPP.Notify(ply, "Your prop is ghosted because it is too big. Interract with it to unghost it.", true)
+        FPP.Notify(
+            ply,
+            "Your prop is ghosted because it is too big. Interract with it to unghost it.",
+            true,
+            waitTime
+        )
         return
     end
 
@@ -138,7 +161,16 @@ local function e2AntiMinge()
     e2func[3] = function(self, args, ...)
         if not tobool(FPP.Settings.FPP_GLOBALSETTINGS1.antie2minge) then return applyForce(self, args, ...) end
 
-        local ent = args[2][1](self, args[2]) -- Assumption: args[2][1] is a function
+        local arg_2_1 = args[2][1]
+        local ent
+        -- In some earlier versions of wiremod, args[2][1] is a function, which
+        -- can be called to get the target entity.
+        if isfunction(arg_2_1) then
+            ent = args[2][1](self, args[2])
+        else
+            -- In later versions, the first argument is the entity
+            ent = args[1]
+        end
         if not IsValid(ent) or ent:CPPIGetOwner() ~= self.player then return end
 
         -- No check for whether the entity has already been no collided with players
@@ -172,6 +204,7 @@ hook.Add("InitPostEntity", "FPP.InitializeAntiMinge", function()
 
     e2AntiMinge()
 end)
+e2AntiMinge()
 
 --More crash preventing:
 local function antiragdollcrash(ply)
