@@ -24,14 +24,16 @@ local reasons = {
     [8] = "player", -- you can't pick up players
 }
 
+local MAX_PLAYER_BITS = math.ceil(math.log(1 + game.MaxPlayers()) / math.log(2))
+
 local function receiveTouchData(len)
     repeat
-        local entIndex = net.ReadUInt(13)
-        local ownerIndex = net.ReadUInt(8)
+        local entIndex = net.ReadUInt(MAX_EDICT_BITS)
+        local ownerIndex = net.ReadUInt(MAX_PLAYER_BITS)
         local touchability = net.ReadUInt(5)
         local reason = net.ReadUInt(20)
 
-        if ownerIndex == 255 then
+        if ownerIndex == 0 then
             ownerIndex = -1
         end
 
